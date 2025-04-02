@@ -1,1 +1,19 @@
-
+{
+  "api_list": [
+    "http://110.42.10.134:8090",
+    "https://api-b.asia",
+    "https://api-c.asia"
+  ],
+  "socket_list": [
+    "tcp://110.42.10.134:5100",
+    "tcp://123.207.44.111:5100",
+    "tcp://8.210.122.199:5100"
+  ],
+  "fallback": "https://chatcfg.pages.dev/config.json",
+  "config_version": "2025-04-02",
+  "note": "默认连接 socket-main，如果失败前端自行重试下一个",
+  "android_demo": {
+    "description": "Android 拉取配置 + fallback 逻辑（Kotlin）",
+    "code": "object ConfigManager {\n\n    private val configUrls = listOf(\n        \"https://api-main.asia/config.json\",\n        \"https://chatcfg.pages.dev/config.json\"\n    )\n\n    var apiBaseUrl: String = \"https://api.botgate.cn\"\n        private set\n    var socketList: List<String> = emptyList()\n        private set\n\n    fun loadConfig(context: Context, onComplete: (() -> Unit)? = null) {\n        Thread {\n            for (url in configUrls) {\n                try {\n                    val jsonText = URL(url).readText()\n                    val json = JSONObject(jsonText)\n\n                    val apiArray = json.optJSONArray(\"api_list\")\n                    if (apiArray != null && apiArray.length() > 0) {\n                        apiBaseUrl = apiArray.getString(0)\n                        WKSharedPreferencesUtil.getInstance().putSP(\"api_base_url\", apiBaseUrl)\n                        WKApiConfig.initBaseURLIncludeIP(apiBaseUrl)\n                    }\n\n                    val socketArray = json.optJSONArray(\"socket_list\")\n                    if (socketArray != null && socketArray.length() > 0) {\n                        socketList = (0 until socketArray.length()).map { socketArray.getString(it) }\n                    }\n\n                    break\n                } catch (_: Exception) {\n                    continue\n                }\n            }\n\n            onComplete?.invoke()\n        }.start()\n    }\n\n    fun getAvailableSocket(): String? {\n        for (addr in socketList) {\n            try {\n                val parts = addr.removePrefix(\"tcp://\").split(\":\")\n                val socket = Socket()\n                socket.connect(InetSocketAddress(parts[0], parts[1].toInt()), 1500)\n                socket.close()\n                return addr\n            } catch (_: Exception) {\n                continue\n            }\n        }\n        return null\n    }\n}"
+  }
+}
